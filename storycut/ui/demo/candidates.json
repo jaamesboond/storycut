@@ -1,0 +1,161 @@
+{
+ "meta": {
+  "input_name": "demo-stream-finale.wav",
+  "offset": 0.0,
+  "analysed_seconds": 1800,
+  "signals": [
+   "loudness",
+   "onsets",
+   "transcript cues",
+   "speech density"
+  ],
+  "model": "small",
+  "target": 60.0,
+  "max_len": 180.0,
+  "tool": "storycut"
+ },
+ "candidates": [
+  {
+   "rank": 1,
+   "score": 8.8,
+   "start": 1585.42,
+   "end": 1646.16,
+   "start_hms": "00:26:25",
+   "end_hms": "00:27:26",
+   "duration": 60.7,
+   "trimmed_duration": 51.9,
+   "peak": 1592.0,
+   "peak_hms": "00:26:32",
+   "peak_signals": {
+    "loud": 0.31,
+    "onset": 0.61,
+    "cues": 6.0,
+    "speech": 2.77
+   },
+   "components": {
+    "peak": 3.9,
+    "crowd": 2.0,
+    "payoff": 2.43,
+    "self_explanatory": 0.5
+   },
+   "reasons": [
+    "peak 2.44 above normal -> 3.9/4",
+    "no chat data; 10 reaction cues near peak -> 2.0/2",
+    "reaction after peak: 21 cues ['bro', 'ending', 'swear', 'what the'], 106 words -> 2.4/3",
+    "setup 7s with 17 words (2.6/s) -> 0.5/1"
+   ],
+   "keep_pieces": [
+    [
+     1585.42,
+     1598.5
+    ],
+    [
+     1603.62,
+     1622.28
+    ],
+    [
+     1626.04,
+     1646.16
+    ]
+   ],
+   "llm": null,
+   "transcript": "the worst [beep] ending. That's the what bro. That's the I got the worst ending [beep] my my [beep] died my [beep] These [beep] [beep] died at the worst possible ending chat Hey, I think it ain't tell me [beep]. What the [beep] is a tell me [beep] I got the [beep] worst ending and your [beep] think tell me a [beep] thing They did not have to come like that bro bro [beep] I couldn't get a character [beep] I could have get no death wish on me I could have get an ABC option My god [beep] bro my game just end here [beep] I can't free roam and nothing no more who the [beep] am I free roam with [beep]?"
+  },
+  {
+   "rank": 2,
+   "score": 8.1,
+   "start": 1710.56,
+   "end": 1756.16,
+   "start_hms": "00:28:30",
+   "end_hms": "00:29:16",
+   "duration": 45.6,
+   "trimmed_duration": 32.3,
+   "peak": 1747.0,
+   "peak_hms": "00:29:07",
+   "peak_signals": {
+    "loud": 0.69,
+    "onset": 0.07,
+    "cues": 6.0,
+    "speech": 2.77
+   },
+   "components": {
+    "peak": 3.58,
+    "crowd": 2.0,
+    "payoff": 1.51,
+    "self_explanatory": 1.0
+   },
+   "reasons": [
+    "peak 2.24 above normal -> 3.6/4",
+    "no chat data; 8 reaction cues near peak -> 2.0/2",
+    "reaction after peak: 5 cues ['bro', 'crazy', 'swear'], 9 words -> 1.5/3",
+    "setup 36s with 78 words (2.1/s) -> 1.0/1"
+   ],
+   "keep_pieces": [
+    [
+     1710.56,
+     1731.92
+    ],
+    [
+     1736.11,
+     1742.51
+    ],
+    [
+     1746.42,
+     1749.24
+    ],
+    [
+     1754.48,
+     1756.16
+    ]
+   ],
+   "llm": null,
+   "transcript": "It's just so beautiful So when [beep] got a mark like that, it's like [beep] And it's like, I'mma tell you what got me When they was telling the lawyer Every crime that it did, that is what got me bro I'm like [beep], hold on We done built through hella [beep] They were saying [beep] that I done forgot about [beep] bro, I'm like [beep] But check that, like if I had to check [beep] my [beep], that [beep] was crazy [beep] Bro that's like bro"
+  },
+  {
+   "rank": 3,
+   "score": 3.8,
+   "start": 523.44,
+   "end": 559.06,
+   "start_hms": "00:08:43",
+   "end_hms": "00:09:19",
+   "duration": 35.6,
+   "trimmed_duration": 7.2,
+   "peak": 540.0,
+   "peak_hms": "00:09:00",
+   "peak_signals": {
+    "loud": 0.45,
+    "onset": 0.14,
+    "cues": 4.3,
+    "speech": 1.88
+   },
+   "components": {
+    "peak": 2.05,
+    "crowd": 0.5,
+    "payoff": 0.74,
+    "self_explanatory": 0.5
+   },
+   "reasons": [
+    "peak 1.28 above normal -> 2.1/4",
+    "no chat data; 1 reaction cues near peak -> 0.5/2",
+    "reaction after peak: 1 cues ['no way'], 7 words -> 0.7/3",
+    "setup 17s with 5 words (0.3/s) -> 0.5/1"
+   ],
+   "keep_pieces": [
+    [
+     523.44,
+     525.5
+    ],
+    [
+     538.84,
+     542.08
+    ],
+    [
+     557.16,
+     559.06
+    ]
+   ],
+   "llm": null,
+   "transcript": "coming Jay like this no no way go go go go that"
+  }
+ ]
+}

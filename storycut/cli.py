@@ -2,6 +2,7 @@
 
     storycut find  INPUT  [options]     find ranked story windows
     storycut render SRC --from-report out/candidates.json --rank 1 [layout options]
+    storycut ui [--host 0.0.0.0] [--port 8770]   neon web dashboard (phone-friendly PWA)
 """
 
 from __future__ import annotations
@@ -62,7 +63,23 @@ def main(argv=None) -> int:
     r.add_argument("--crf", type=int, default=23)
     r.add_argument("-o", "--out", default=None)
 
+    u = sub.add_parser("ui", help="open the neon web dashboard (works on phones too)")
+    u.add_argument("--jobs", default="storycut_jobs", help="folder for jobs and results (default storycut_jobs)")
+    u.add_argument("--host", default="127.0.0.1", help="use 0.0.0.0 to open it from your phone on the same Wi-Fi")
+    u.add_argument("--port", type=int, default=8770)
+    u.add_argument("--no-demo", action="store_true", help="do not add the bundled demo job")
+    u.add_argument("--export-icons", metavar="DIR", default=None, help="write the logo + PNG app icons to DIR and exit")
+
     a = p.parse_args(argv)
+
+    if a.cmd == "ui":
+        from .ui.server import export_icons, serve
+        if a.export_icons:
+            for n in export_icons(a.export_icons):
+                print(os.path.join(a.export_icons, n))
+            return 0
+        serve(jobs=a.jobs, host=a.host, port=a.port, demo=not a.no_demo)
+        return 0
 
     if a.cmd == "find":
         from .pipeline import FindOptions, find

@@ -4,18 +4,42 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "storycut"
-version = "0.1.0"
+version = "0.2.0"
 description = "Find full-story clip windows (setup -> build -> payoff) in long livestreams and VODs."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.9"
+authors = [{name = "jaamesboond"}]
+keywords = ["video", "clips", "highlights", "livestream", "vod", "whisper", "faster-whisper", "shorts", "subtitles", "twitch", "youtube"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Environment :: Web Environment",
+  "Intended Audience :: End Users/Desktop",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Multimedia :: Video",
+  "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
 dependencies = ["faster-whisper>=1.0", "numpy>=1.24"]
 
 [project.optional-dependencies]
 url = ["yt-dlp"]
 
+[project.urls]
+Homepage = "https://github.com/jaamesboond/storycut"
+Source = "https://github.com/jaamesboond/storycut"
+Issues = "https://github.com/jaamesboond/storycut/issues"
+Changelog = "https://github.com/jaamesboond/storycut/blob/main/CHANGELOG.md"
+
 [project.scripts]
 storycut = "storycut.cli:main"
 
 [tool.setuptools]
-packages = ["storycut"]
+packages = ["storycut", "storycut.ui"]
+
+[tool.setuptools.package-data]
+"storycut.ui" = ["static/*", "demo/*"]

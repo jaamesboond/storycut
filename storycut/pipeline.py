@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 
@@ -37,18 +37,47 @@ class FindOptions:
     llm: bool = False
     weights: dict = field(default_factory=dict)
     log: bool = True
+    progress: Optional[Callable[[str, float], None]] = None  # (stage, 0..1) for the dashboard
 
 
-def _log(opts: FindOptions, msg: str) -> None:
+def _log(opts: FindOptions, msg: str, frac: Optional[float] = None) -> None:
     if opts.log:
         print(f"[storycut] {msg}", flush=True)
+    if opts.progress is not None:
+        try:
+            opts.progress(msg, frac if frac is not None else -1.0)
+        except Exception:  # a broken progress hook must never kill a job
+            pass
+
+
+def downsample(curve, max_points: int = 900) -> List[float]:
+    """Max-pool a per-second curve to at most max_points values (keeps peaks visible)."""
+    a = np.asarray(curve, dtype=float)
+    if len(a) == 0:
+        return []
+    if len(a) <= max_points:
+        return [round(float(x), 3) for x in a]
+    step = int(np.ceil(len(a) / max_points))
+    pad = (-len(a)) % step
+    if pad:
+        a = np.concatenate([a, np.full(pad, a[-1])])
+    return [round(float(x), 3) for x in a.reshape(-1, step).max(axis=1)]
+
+
+def curve_payload(combined, parts: dict, offset: float = 0.0, max_points: int = 900) -> dict:
+    """JSON-ready excitement curve (combined + each signal) for charts."""
+    n = len(combined)
+    pts = downsample(combined, max_points)
+    step = n / len(pts) if pts else 1.0
+    return {"offset": offset, "seconds": n, "step": round(step, 3), "combined": pts,
+            "parts": {k: downsample(v, max_points) for k, v in parts.items()}}
 
 
 def find(input_path: str, opts: FindOptions) -> dict:
     os.makedirs(opts.out_dir, exist_ok=True)
     chat_path = opts.chat
     if media.is_url(input_path):
-        _log(opts, "downloading with yt-dlp ...")
+        _log(opts, "downloading with yt-dlp ...", 0.02)
         got = media.download(input_path, os.path.join(opts.out_dir, "download"))
         input_path, chat_path = got["media"], chat_path or got["chat"]
 
@@ -58,15 +87,15 @@ def find(input_path: str, opts: FindOptions) -> dict:
     tag = f"{Path(input_path).stem}_{int(opts.start)}_{int(dur)}"
     wav = os.path.join(opts.out_dir, f"{tag}.wav")
     if not os.path.exists(wav):
-        _log(opts, f"extracting audio {opts.start:.0f}s + {dur:.0f}s ...")
+        _log(opts, f"extracting audio {opts.start:.0f}s + {dur:.0f}s ...", 0.05)
         media.extract_audio(input_path, wav, start=opts.start, duration=dur)
     samples, sr = media.read_wav(wav)
     n = int(len(samples) // sr)
 
-    _log(opts, f"transcribing with faster-whisper ({opts.model}) ...")
+    _log(opts, f"transcribing with faster-whisper ({opts.model}) ...", 0.12)
     words = transcribe(wav, model_size=opts.model, language=opts.language,
                        cache_path=os.path.join(opts.out_dir, f"{tag}.words.json"))
-    _log(opts, f"{len(words)} words")
+    _log(opts, f"{len(words)} words", 0.7)
 
     loud = signals.rms_per_second(samples, sr)
     onset = signals.onset_per_second(samples, sr)
@@ -84,7 +113,7 @@ def find(input_path: str, opts: FindOptions) -> dict:
 
     cuts: List[float] = []
     if opts.scenes and media.has_video(input_path):
-        _log(opts, "detecting scene changes ...")
+        _log(opts, "detecting scene changes ...", 0.75)
         cuts = media.scene_cuts(input_path, start=opts.start, duration=dur)
         curves["scene"] = signals.events_to_curve([(t, 1.0) for t in cuts], n, spread=1)
         used.append(f"scene cuts ({len(cuts)})")
@@ -92,7 +121,7 @@ def find(input_path: str, opts: FindOptions) -> dict:
     curves = {k: (np.asarray(v)[:n] if v is not None else None) for k, v in curves.items()}
     combined, parts = signals.combine(curves, opts.weights)
     peaks = signals.find_peaks(combined, top_k=opts.candidates, min_gap=opts.min_gap, parts=parts)
-    _log(opts, f"{len(peaks)} peaks")
+    _log(opts, f"{len(peaks)} peaks", 0.85)
 
     sentences = story.sentences_from_words(words)
     windows: List[Window] = []
@@ -133,7 +162,8 @@ def find(input_path: str, opts: FindOptions) -> dict:
                 media._run(["ffmpeg", "-y", "-v", "error", "-i", input_path, "-ss", f"{a:.3f}", "-to", f"{b:.3f}",
                             "-c:a", "aac", "-b:a", "160k", out])
     # words for the render step (relative to chunk start)
+    report.write_json(os.path.join(opts.out_dir, "curve.json"), curve_payload(combined, parts, opts.start))
     report.write_json(os.path.join(opts.out_dir, "words.json"),
                       {"offset": opts.start, "words": [w.to_dict() for w in words]})
-    _log(opts, f"done -> {os.path.join(opts.out_dir, 'report.md')}")
+    _log(opts, f"done -> {os.path.join(opts.out_dir, 'report.md')}", 1.0)
     return data

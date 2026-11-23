@@ -1,0 +1,18 @@
+{
+ "id": "demo-kai-finale",
+ "status": "done",
+ "stage": "done",
+ "progress": 1.0,
+ "demo": true,
+ "input": "Demo: 30-min GTA VI finale stream tail (audio only)",
+ "created": 1795410000,
+ "options": {
+  "model": "small",
+  "target": 60,
+  "max_len": 180,
+  "top": 5
+ },
+ "log": [
+  "demo job bundled with storycut: real scores from a 30-min stream tail, transcript profanity masked"
+ ]
+}

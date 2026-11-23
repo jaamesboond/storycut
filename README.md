@@ -1,6 +1,32 @@
-# storycut
+<p align="center">
+  <img src="storycut/ui/static/logo.svg" width="128" alt="storycut logo">
+</p>
 
-**Find full-story clips in long livestreams and VODs, not just the loudest second.**
+<h1 align="center">storycut</h1>
+
+<p align="center"><b>Find the whole story in long streams, not just the loudest second.</b><br>
+Open-source clip finder: setup → build → payoff windows, scored 0–10 with reasons. Runs on CPU, no cloud key needed.</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-ff2e97?style=flat-square"></a>
+  <img alt="Python 3.9+" src="https://img.shields.io/badge/python-3.9%2B-39ff14?style=flat-square&logo=python&logoColor=white">
+  <img alt="tests: 33 passing" src="https://img.shields.io/badge/tests-33%20passing-00e5ff?style=flat-square">
+  <img alt="runs on CPU" src="https://img.shields.io/badge/runs%20on-CPU-a89fc0?style=flat-square">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/demo.svg" width="860" alt="storycut dashboard demo: home, new job, results, story detail">
+</p>
+
+## Quick start
+
+```bash
+pip install git+https://github.com/jaamesboond/storycut   # needs ffmpeg on PATH
+storycut find stream.mp4 -o out                           # ranked story windows + SRTs
+storycut ui                                               # neon dashboard at http://127.0.0.1:8770
+```
+
+---
 
 Most "auto-clip" tools return the peak moment: a scream, a chat spike, a kill.
 A short built from that second alone makes no sense to someone who wasn't
@@ -18,6 +44,7 @@ It runs on CPU (tested on a 1.5-core Linux VM), needs no paid API, and is MIT
 licensed.
 
 ---
+
 
 ## What it uses
 
@@ -103,6 +130,59 @@ python -m storycut render stream.mp4 --from-report out/candidates.json --rank 1 
 
 Without `--facecam`, the gameplay is fitted to full width on a dark background.
 
+## Dashboard (`storycut ui`)
+
+```bash
+storycut ui                         # http://127.0.0.1:8770  (a demo job is included)
+storycut ui --host 0.0.0.0          # also reachable from your phone on the same Wi-Fi
+storycut ui --jobs ~/clips --port 9000 --no-demo
+```
+
+A small local web app (Python standard library only, no build step, no extra
+dependencies) on top of the same pipeline:
+
+* **New job**: file path or VOD URL, start/duration chunk, Whisper model, story length, chat file, scene detection
+* **Live progress** while it downloads, transcribes and scores (one heavy job at a time, so a small CPU is not overloaded)
+* **Results**: excitement curve with every story window shaded, score badges, setup/build/peak/payoff timeline with trimmed dead air
+* **Story detail**: score breakdown and reasons, transcript (profanity masked), clip preview, buttons to **cut clip**, **export SRT** and **render 9:16**
+* **Settings**: default model and lengths, render crops, hook/end text, watermark
+* Installable **PWA** (manifest + service worker): "Add to Home screen" on Android gives it its own icon and full-screen window
+
+| Results | Story detail |
+|---|---|
+| <img src="docs/screenshots/desktop-results.svg" alt="results list"> | <img src="docs/screenshots/desktop-detail.svg" alt="candidate detail"> |
+
+| New job | Phone (390 px) | Phone: detail |
+|---|---|---|
+| <img src="docs/screenshots/desktop-new.svg" alt="new job form"> | <img src="docs/screenshots/mobile-results.svg" width="230" alt="mobile results"> | <img src="docs/screenshots/mobile-detail.svg" width="230" alt="mobile detail"> |
+
+The dashboard only listens on `127.0.0.1` unless you pass `--host 0.0.0.0`.
+It has no login, so only expose it on a network you trust.
+
+## On your phone (Android)
+
+**Recommended: run storycut on a PC, open it on the phone.** Start
+`storycut ui --host 0.0.0.0` on the computer; the home page shows the LAN link
+(for example `http://192.168.1.20:8770`). Open it in Chrome on the phone (same
+Wi-Fi) and choose **Add to Home screen**. Transcription runs on the PC, the phone
+is just the remote.
+
+**Fully on the phone with [Termux](https://termux.dev)** (possible, but slow):
+
+```bash
+pkg update && pkg install python ffmpeg git
+pip install numpy
+pip install faster-whisper            # may need: pkg install rust clang  (builds native parts)
+pip install git+https://github.com/jaamesboond/storycut
+storycut ui --host 0.0.0.0            # then open http://127.0.0.1:8770 in the phone browser
+```
+
+Honest notes: a phone CPU transcribes much slower than a PC, so use `--model tiny`
+or `base` and short `--duration` chunks (10–20 min). Installing faster-whisper's
+native dependencies on Termux can fail on some devices. The Termux steps above
+are documented but **not yet tested on a real phone**; the dashboard itself was
+tested in a 390x844 mobile viewport.
+
 ## How scoring works
 
 | Part | Points | Meaning |
@@ -151,6 +231,24 @@ Only the transcripts of the candidate windows are sent. Final score =
 0.6 x signal score + 0.4 x LLM score. If the call fails, the run continues
 with the signal scores.
 
+## Why storycut vs other clippers
+
+Honest comparison, from what has actually been tested:
+
+| | storycut | typical auto-clippers |
+|---|---|---|
+| What it returns | a full **story window** (setup → payoff), cut at sentence ends | the peak seconds, fixed length |
+| Explains itself | 0–10 score with per-part reasons | usually a single number or none |
+| Cost / privacy | local, CPU, no account, no API key (LLM re-rank is opt-in) | many are cloud services with quotas |
+| Languages | English + romanised Hindi/Urdu reaction cues | mostly English |
+| Live recording | **no** (VODs and files only) | some record live streams directly |
+| Face tracking / auto layout | **no**, crops are manual | some do |
+| Quiet moments | **misses** silent shocked moments (no audio/chat signal) | same problem for audio-based tools |
+
+On our one real test, the #1 window matched what a human editor had already cut
+by hand. That is one stream, not a benchmark. If you run storycut next to
+another tool on the same VOD, please share the results in an issue.
+
 ## Tested on
 
 A 30-minute audio chunk from the end of a GTA VI finale livestream (English,
@@ -178,7 +276,13 @@ python -m unittest discover -s tests -v
 ```
 
 The pure logic (signals, peak picking, story expansion, scoring, chat parsing,
-captions, beep filter) is covered without needing any media files.
+captions, beep filter, dashboard helpers) is covered without needing any media
+files, and the dashboard server is tested in-process against the bundled demo job.
+
+## Contributing
+
+Bug reports, test results on real streams and new language cue lists are very
+welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md).
 
 ## Limits
 
@@ -193,4 +297,4 @@ captions, beep filter) is covered without needing any media files.
 
 ## License
 
-MIT
+MIT. The logo in `storycut/ui/static/logo.svg` is part of this project and under the same license.

@@ -42,7 +42,7 @@ CUE_PHRASES: Dict[str, float] = {
 # Profanity is a strong excitement cue in streams (and is also what the render
 # helper beeps). Kept short and generic on purpose.
 PROFANITY: List[str] = [
-    "fuck", "fucking", "fucked", "motherfucker", "shit", "bitch", "bastard", "damn",
+    "fuck", "fucking", "fucked", "motherfucker", "motherfuck", "shit", "bitch", "bastard", "damn",
     "asshole", "dick", "nigga", "wtf",
     "bc", "mc", "bsdk", "bhenchod", "behenchod", "madarchod", "chutiya", "gandu", "harami",
     "kutta", "kamina", "saala", "sala",

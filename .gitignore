@@ -17,3 +17,5 @@ storycut_out/
 *secret*
 token.json
 client_secret*.json
+docs/screenshots/*.png
+docs/screenshots/*.gif
