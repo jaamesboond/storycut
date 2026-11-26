@@ -43,7 +43,7 @@ main{max-width:1180px;margin:0 auto;padding:20px}
 .tabbar a.fab{font-size:0}
 
 /* cards + layout */
-.grid{display:grid;gap:16px}
+.grid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
 .g2{grid-template-columns:1.25fr 1fr} .g3{grid-template-columns:repeat(3,1fr)}
 .card{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:var(--r);padding:18px;position:relative}
 .card.glow-p{box-shadow:0 0 0 1px rgba(255,46,151,.55),0 0 30px rgba(255,46,151,.12)}
@@ -81,10 +81,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--pink);box-shadow:var(
 .chip.on{color:var(--green);border-color:var(--green);box-shadow:var(--glow-g)}
 
 /* jobs */
-.job{display:flex;gap:14px;align-items:center;cursor:pointer}
+.job{display:flex;gap:14px;align-items:center;cursor:pointer;min-width:0}
 .job:hover{border-color:var(--pink)}
 .job .t{flex:1;min-width:0}
 .job .t b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.job .t span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pill{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:4px 10px;border-radius:20px;border:1px solid}
 .pill.done{color:var(--green);border-color:var(--green)} .pill.running,.pill.queued{color:var(--cyan);border-color:var(--cyan)}
 .pill.error{color:var(--pink);border-color:var(--pink)}

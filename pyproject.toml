@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "storycut"
-version = "0.2.0"
+version = "0.2.1"
 description = "Find full-story clip windows (setup -> build -> payoff) in long livestreams and VODs."
 readme = "README.md"
 license = {text = "MIT"}

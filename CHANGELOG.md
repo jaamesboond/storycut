@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1 (2026-11-27)
+
+* Dashboard: fixed horizontal overflow on phones (grid columns can shrink,
+  long job names and details now truncate instead of widening the page).
+
 ## 0.2.0 (2026-11-23)
 
 * New **dashboard**: `storycut ui` starts a local neon web app (standard library

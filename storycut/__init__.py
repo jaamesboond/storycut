@@ -1,3 +1,3 @@
 """storycut: find full-story clip windows (setup -> build -> payoff) in long streams and VODs."""
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
