@@ -37,9 +37,12 @@ def caption_chunks(words: Sequence[Word], max_words: int = 4, max_gap: float = 0
     return out
 
 
-def window_srt(window: Window, words: Sequence[Word], max_words: int = 4) -> str:
-    """SRT with times relative to the window start (ready to burn into the cut clip)."""
-    inside = [Word(w.start - window.start, w.end - window.start, w.text, w.prob)
+def window_srt(window: Window, words: Sequence[Word], max_words: int = 4, mask: bool = True) -> str:
+    """SRT with times relative to the window start (ready to burn into the cut clip).
+    mask=True writes [beep] in place of swear words (same list the render beeps)."""
+    from .signals import is_profane
+    inside = [Word(w.start - window.start, w.end - window.start,
+                   "[beep]" if mask and is_profane(w.text) else w.text, w.prob)
               for w in words if w.start >= window.start and w.end <= window.end]
     lines = []
     for i, (a, b, text) in enumerate(caption_chunks(inside, max_words=max_words), 1):

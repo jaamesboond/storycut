@@ -49,6 +49,176 @@ def lan_addresses() -> list:
     return sorted(ip for ip in ips if not ip.startswith("127."))
 
 
+class LiveManager:
+    """Live sessions: folders under <jobs>/live/<id>. Each running session is a thread.
+    Sessions that were still running when the server stopped are resumed on start."""
+
+    def __init__(self, root: str):
+        self.root = os.path.join(root, "live")
+        os.makedirs(self.root, exist_ok=True)
+        self.running = {}            # id -> (LiveSession, Thread)
+        self.heavy = threading.Lock()  # one cut/render at a time
+
+    def _dir(self, sid: str) -> Optional[str]:
+        sid = core.safe_job_id(sid)
+        d = os.path.join(self.root, sid) if sid else None
+        return d if d and os.path.isdir(d) else None
+
+    def _opts(self, d: str, o: dict):
+        from ..live import LiveOptions
+        return LiveOptions(out_dir=d, model=o.get("model") or "base", language=o.get("language") or None,
+                           transcribe=o.get("transcribe") or "auto", min_score=float(o.get("min_score") or 5.5),
+                           follow=bool(o.get("follow")), cut=bool(o.get("cut")) or bool(o.get("render")),
+                           render=bool(o.get("render")), facecam=o.get("facecam") or None,
+                           gameplay=o.get("gameplay") or None, hook=o.get("hook") or None,
+                           captions=o.get("captions") or "clean", log=False,
+                           speed=max(1.0, min(8.0, float(o.get("speed") or 1.0))))
+
+    def start(self, body: dict, settings: dict) -> tuple:
+        src = str(body.get("source") or "").strip()
+        if not src:
+            return None, "give a stream URL or a file path"
+        from ..live import is_url
+        if not is_url(src) and not os.path.isfile(os.path.expanduser(src)):
+            return None, "not a URL and no such file on this machine"
+        if not is_url(src):
+            src = os.path.abspath(os.path.expanduser(src))
+        sid = "live-" + core.new_job_id(src)
+        while os.path.exists(os.path.join(self.root, sid)):
+            sid += "x"
+        d = os.path.join(self.root, sid)
+        os.makedirs(d)
+        o = {k: body.get(k) for k in ("model", "language", "transcribe", "min_score", "follow", "cut", "render", "speed")}
+        if o.get("render"):
+            o.update(facecam=settings.get("facecam"), gameplay=settings.get("gameplay"), hook=settings.get("hook"),
+                     captions=settings.get("captions") or "clean")
+        meta = {"id": sid, "source": src, "options": o, "created": time.time(), "stopped": False}
+        core_write(os.path.join(d, "session.json"), meta)
+        self._launch(sid, d, meta)
+        return sid, None
+
+    def _launch(self, sid: str, d: str, meta: dict):
+        from ..live import LiveSession
+        sess = LiveSession(meta["source"], self._opts(d, meta.get("options") or {}))
+        t = threading.Thread(target=sess.run, daemon=True)
+        self.running[sid] = (sess, t)
+        t.start()
+
+    def resume_all(self):
+        for sid in sorted(os.listdir(self.root)):
+            d = os.path.join(self.root, sid)
+            meta = core.load_json(os.path.join(d, "session.json"))
+            st = core.load_json(os.path.join(d, "state.json")) or {}
+            if meta and not meta.get("stopped") and st.get("status") not in ("ended", "error"):
+                try:
+                    self._launch(sid, d, meta)
+                except Exception:
+                    traceback.print_exc()
+
+    def is_running(self, sid: str) -> bool:
+        r = self.running.get(sid)
+        return bool(r and r[1].is_alive())
+
+    def info(self, sid: str, mask: bool = False) -> Optional[dict]:
+        d = self._dir(sid)
+        if not d:
+            return None
+        meta = core.load_json(os.path.join(d, "session.json")) or {}
+        cands = (core.load_json(os.path.join(d, "candidates.json")) or {}).get("candidates", [])
+        run = self.is_running(sid)
+        if run:
+            state = self.running[sid][0].snapshot()
+        else:
+            st = core.load_json(os.path.join(d, "state.json")) or {}
+            from ..report import fmt_hms
+            state = {"status": st.get("status", "ended") if not meta.get("stopped") else "stopped",
+                     "stream_seconds": st.get("tl_end", 0), "stream_hms": fmt_hms(st.get("tl_end", 0)),
+                     "stories": len(cands), "dropped": len(st.get("dropped", [])),
+                     "mode": (st.get("options") or {}).get("transcribe"), "events": _tail_events(d)}
+        for c in cands:
+            c["timeline"] = core.timeline(c)
+            c["heat"] = core.heat(c["score"])
+            c["files"] = core.clip_files(d, c["rank"])
+            if mask:
+                for k in ("title", "transcript", "setup_line", "shout"):
+                    if c.get(k):
+                        c[k] = core.mask_text(c[k])
+        if mask:
+            state = dict(state, events=[dict(e, detail=core.mask_text(e.get("detail", "")),
+                                             title=core.mask_text(e.get("title", ""))) for e in state.get("events", [])])
+        return {"id": sid, "source": meta.get("source"), "running": run, "status": state.get("status"),
+                "state": state, "candidates": cands, "created": meta.get("created")}
+
+    def list(self) -> list:
+        out = []
+        for sid in os.listdir(self.root):
+            i = self.info(sid)
+            if i:
+                out.append({"id": sid, "source": i["source"], "running": i["running"], "status": i["status"],
+                            "stories": len(i["candidates"]), "stream_hms": i["state"].get("stream_hms"),
+                            "best": max((c["score"] for c in i["candidates"]), default=None),
+                            "created": i["created"]})
+        out.sort(key=lambda x: -(x.get("created") or 0))
+        return out
+
+    def stop(self, sid: str) -> Optional[str]:
+        d = self._dir(sid)
+        if not d:
+            return "session not found"
+        meta = core.load_json(os.path.join(d, "session.json")) or {}
+        meta["stopped"] = True
+        core_write(os.path.join(d, "session.json"), meta)
+        r = self.running.get(sid)
+        if r:
+            r[0].stop()
+        return None
+
+    def action(self, sid: str, kind: str, rank: int) -> Optional[str]:
+        d = self._dir(sid)
+        if not d:
+            return "session not found"
+        cands = (core.load_json(os.path.join(d, "candidates.json")) or {}).get("candidates", [])
+        if not any(c["rank"] == rank for c in cands):
+            return f"story {rank} not in this session"
+
+        def job():
+            with self.heavy:
+                try:
+                    if self.is_running(sid):
+                        sess = self.running[sid][0]
+                    else:
+                        from ..live import LiveSession
+                        meta = core.load_json(os.path.join(d, "session.json")) or {}
+                        sess = LiveSession(meta.get("source", ""), self._opts(d, meta.get("options") or {}))
+                    if kind == "render":
+                        s = core.load_json(os.path.join(os.path.dirname(self.root), "settings.json"), {}) or {}
+                        sess.o.facecam = s.get("facecam") or sess.o.facecam
+                        sess.o.gameplay = s.get("gameplay") or sess.o.gameplay
+                        sess.o.hook = s.get("hook") or sess.o.hook
+                        sess.o.captions = s.get("captions") or sess.o.captions
+                    sess.cut(rank, render=(kind == "render"))
+                    sess.save_state()
+                except Exception:
+                    traceback.print_exc()
+        threading.Thread(target=job, daemon=True).start()
+        return None
+
+
+def core_write(path: str, data) -> None:
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=1, ensure_ascii=False)
+    os.replace(path + ".tmp", path)
+
+
+def _tail_events(d: str, n: int = 30) -> list:
+    try:
+        with open(os.path.join(d, "live.jsonl"), "r", encoding="utf-8") as f:
+            lines = f.readlines()[-n:]
+        return [json.loads(x) for x in lines if x.strip()]
+    except (OSError, ValueError):
+        return []
+
+
 class Store:
     def __init__(self, root: str):
         self.root = os.path.abspath(os.path.expanduser(root))
@@ -57,6 +227,7 @@ class Store:
         self.q: "queue.Queue" = queue.Queue()
         self.worker = threading.Thread(target=self._work, daemon=True)
         self.worker.start()
+        self.live = LiveManager(self.root)
 
     # ---- settings
     @property
@@ -115,7 +286,7 @@ class Store:
     def list(self) -> list:
         out = []
         for name in os.listdir(self.root):
-            if core.safe_job_id(name) and os.path.isdir(os.path.join(self.root, name)):
+            if name != "live" and core.safe_job_id(name) and os.path.isdir(os.path.join(self.root, name)):
                 m = self.meta(name)
                 if m:
                     out.append(m)
@@ -213,7 +384,8 @@ class Store:
             render(src, c["start"], c["end"], words, os.path.join(d, f"short_rank{rank}.mp4"),
                    facecam=s["facecam"] or None, gameplay=s["gameplay"] or None, hook=s["hook"] or None,
                    end_text=s["end_text"] or None, watermark=s["watermark"] or None, crf=int(s["crf"]),
-                   font=s["font"])
+                   font=s["font"], captions=s["captions"], caption_pos=s["caption_pos"], track=bool(s["track"]),
+                   loudnorm=bool(s["loudnorm"]), thumbnail=bool(s["thumb"]))
         elif kind == "srt":
             words, off = load_words(os.path.join(d, "words.json"))
             w = Window(start=c["start"], end=c["end"], peak=Peak(t=c["peak"], value=0))
@@ -364,6 +536,19 @@ class Handler(BaseHTTPRequestHandler):
                                "queue": st.q.qsize()})
         if parts[:2] == ["api", "settings"]:
             return self._json(st.settings())
+        if parts[:2] == ["api", "live"]:
+            if len(parts) == 2:
+                return self._json({"sessions": st.live.list()})
+            i = st.live.info(parts[2], mask=st.settings()["mask_profanity"])
+            if not i:
+                return self._err("session not found", 404)
+            if len(parts) == 3:
+                return self._json(i)
+            if parts[3] == "file" and len(parts) == 5:
+                p = core.safe_file(st.live._dir(parts[2]), parts[4])
+                if not p or not p.endswith((".mp4", ".m4a", ".srt", ".md", ".json")):
+                    return self._err("not found", 404)
+                return self._file(p, download_name=parts[4] if p.endswith((".srt", ".md", ".json")) else None)
         if parts[:2] == ["api", "jobs"]:
             if len(parts) == 2:
                 return self._json({"jobs": st.list()})
@@ -397,6 +582,19 @@ class Handler(BaseHTTPRequestHandler):
             if err:
                 return self._err(err)
             return self._json(st.create(opts), 201)
+        if parts == ["api", "live"]:
+            sid, err = st.live.start(body, st.settings())
+            return self._err(err) if err else self._json(st.live.info(sid), 201)
+        if len(parts) == 4 and parts[:2] == ["api", "live"] and parts[3] == "stop":
+            err = st.live.stop(parts[2])
+            return self._err(err, 404) if err else self._json({"ok": True})
+        if len(parts) == 5 and parts[:2] == ["api", "live"] and parts[3] in ("cut", "render"):
+            try:
+                rank = int(parts[4])
+            except ValueError:
+                return self._err("bad rank")
+            err = st.live.action(parts[2], parts[3], rank)
+            return self._err(err, 409) if err else self._json({"ok": True, "queued": parts[3], "rank": rank})
         if len(parts) == 5 and parts[:2] == ["api", "jobs"] and parts[3] in ("cut", "render", "srt"):
             try:
                 rank = int(parts[4])
@@ -412,6 +610,7 @@ def serve(jobs: str = "storycut_jobs", host: str = "127.0.0.1", port: int = 8770
     if demo:
         install_demo(store.root)
     Handler.store = store
+    store.live.resume_all()
     httpd = ThreadingHTTPServer((host, port), Handler)
     print(f"storycut dashboard on http://{'localhost' if host in ('127.0.0.1', '0.0.0.0') else host}:{port}")
     if host == "0.0.0.0":

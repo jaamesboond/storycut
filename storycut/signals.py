@@ -44,8 +44,21 @@ CUE_PHRASES: Dict[str, float] = {
 PROFANITY: List[str] = [
     "fuck", "fucking", "fucked", "motherfucker", "motherfuck", "shit", "bitch", "bastard", "damn",
     "asshole", "dick", "nigga", "wtf",
-    "bc", "mc", "bsdk", "bhenchod", "behenchod", "madarchod", "chutiya", "gandu", "harami",
-    "kutta", "kamina", "saala", "sala",
+    "bc", "mc", "bsdk", "bhenchod", "behenchod", "madarchod",
+]
+
+# Hindi / Urdu / Nepali swears (Roman + Devanagari + Urdu script), matched as WHOLE
+# words only: prefix matching here would hit normal words ("chodo" = "leave it").
+PROFANITY_EXACT: List[str] = [
+    "bhosdi", "bhosdike", "bhosdika", "bhosadike", "bhosda", "bhosri", "bhosriwala", "lund", "lauda",
+    "lavda", "laude", "lode", "loda", "randi", "randwa", "gaand", "gand", "gaandu", "gandu", "chod", "chodu",
+    "chut", "choot", "chutiye", "chutia", "chutiyapa", "kutti", "kuttiya", "kanjar", "kanjri", "bharwa",
+    "bharwe", "haramzada", "haramzade", "haramkhor", "haramzadi", "betichod", "tatte", "jhaant", "jhatu",
+    "muji", "machikne", "randiko", "chutiya", "harami", "haramiyon", "kutta", "kutte", "kamina", "kamine",
+    "kamini", "saala", "sala", "saale", "saali",
+    "चूतिया", "चुतिया", "मादरचोद", "बहनचोद", "भेनचोद", "भोसड़ी", "भोसडीके", "गांडू", "गांड", "लौड़ा", "लंड",
+    "रंडी", "हरामी", "हरामज़ादा", "कमीना", "मुजी",
+    "چوتیا", "مادرچود", "بہنچود", "بھینچود", "حرامی", "حرامزادہ", "گانڈو", "کنجر", "کمینہ", "بھڑوا", "رنڈی",
 ]
 
 LAUGH_RE = re.compile(r"^(ha){2,}h?$|^(he){2,}$|^l+o+l+$|^lmao+$")
@@ -64,7 +77,10 @@ def is_profane(token: str) -> bool:
     for p in PROFANITY:
         if t == p or (len(p) >= 4 and t.startswith(p)):
             return True
-    return False
+    return t in _EXACT
+
+
+_EXACT = set()  # filled below (needs normalize)
 
 
 def cue_events(words: Sequence[Word], max_ngram: int = 4) -> List[tuple]:
@@ -215,3 +231,6 @@ def find_peaks(curve: Sequence[float], top_k: int = 10, min_gap: float = 90.0,
             src = {k: round(float(p[idx]), 2) for k, p in (parts or {}).items() if idx < len(p)}
             chosen.append(Peak(t=float(idx) + offset, value=round(v, 3), sources=src))
     return chosen
+
+
+_EXACT.update(normalize(p).replace("'", "") for p in PROFANITY_EXACT)

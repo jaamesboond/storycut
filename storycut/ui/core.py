@@ -34,6 +34,11 @@ DEFAULT_SETTINGS = {
     "watermark": "",
     "font": "Poppins ExtraBold",
     "crf": 23,
+    "captions": "clean",
+    "caption_pos": "seam",
+    "track": True,
+    "loudnorm": False,
+    "thumb": True,
     "mask_profanity": True,
 }
 
@@ -128,6 +133,10 @@ def merge_settings(current: dict, patch: dict) -> dict:
             out[k] = "" if v is None else str(v)
     if out["model"] not in MODELS:
         out["model"] = DEFAULT_SETTINGS["model"]
+    if out["captions"] not in ("clean", "box", "karaoke", "pop", "minimal"):
+        out["captions"] = DEFAULT_SETTINGS["captions"]
+    if out["caption_pos"] not in ("seam", "top", "middle", "lower-third"):
+        out["caption_pos"] = DEFAULT_SETTINGS["caption_pos"]
     return out
 
 
@@ -208,7 +217,7 @@ def clip_files(job_dir: str, rank: int) -> Dict[str, str]:
     found = {}
     for kind, names in (("clip", (f"clip{rank:02d}.mp4", f"clip{rank:02d}.m4a")),
                         ("srt", (f"clip{rank:02d}.srt",)),
-                        ("short", (f"short_rank{rank}.mp4",))):
+                        ("short", (f"short_rank{rank}.mp4",)), ("thumb", (f"short_rank{rank}.jpg",))):
         for n in names:
             if os.path.isfile(os.path.join(job_dir, n)):
                 found[kind] = n

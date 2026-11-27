@@ -145,6 +145,42 @@ class TestServer(unittest.TestCase):
         self.assertEqual(code, 400)
         self.assertEqual(self.get("/api/jobs/..%2Fx")[0], 404)
 
+    def test_live_endpoints(self):
+        import os
+        import shutil
+        code, _, body = self.get("/api/live")
+        self.assertEqual(code, 200)
+        self.assertIsInstance(json.loads(body)["sessions"], list)
+        code, _, body = self.get("/api/live", data=json.dumps({"source": "/no/such.ts"}).encode())
+        self.assertEqual(code, 400)
+        # a finished session on disk shows up with its stories
+        root = self.httpd.RequestHandlerClass.store.live.root
+        d = os.path.join(root, "live-test-1")
+        os.makedirs(d, exist_ok=True)
+        shutil.copy(os.path.join(self.httpd.RequestHandlerClass.store.root, "demo-kai-finale", "candidates.json"),
+                    os.path.join(d, "candidates.json"))
+        with open(os.path.join(d, "session.json"), "w") as f:
+            json.dump({"id": "live-test-1", "source": "https://www.twitch.tv/x", "options": {}, "stopped": True}, f)
+        code, _, body = self.get("/api/live")
+        ids = [x["id"] for x in json.loads(body)["sessions"]]
+        self.assertIn("live-test-1", ids)
+        code, _, body = self.get("/api/live/live-test-1")
+        i = json.loads(body)
+        self.assertFalse(i["running"])
+        self.assertIn("timeline", i["candidates"][0])
+        self.assertEqual(self.get("/api/live/live-test-1/file/session.json")[0], 200)
+        self.assertEqual(self.get("/api/live/live-test-1/file/..%2F..%2Fsettings.json")[0], 404)
+        self.assertEqual(self.get("/api/live/live-test-1/cut/99", data=b"")[0], 409)
+        self.assertEqual(self.get("/api/live/live-test-1/stop", data=b"")[0], 200)
+        # jobs list does not show the live folder as a job
+        code, _, body = self.get("/api/jobs")
+        self.assertFalse(any(j["id"] == "live" for j in json.loads(body)["jobs"]))
+
+    def test_credit_in_page(self):
+        code, _, body = self.get("/")
+        self.assertIn(b"By Ty Yb", body)
+        self.assertIn(b"https://www.instagram.com/tayyabtufail", body)
+
     def test_settings_roundtrip(self):
         code, _, body = self.get("/api/settings", data=json.dumps({"top": 3, "hook": "NO WAY|BRO"}).encode())
         self.assertEqual(json.loads(body)["top"], 3)
